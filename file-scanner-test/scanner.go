@@ -11,9 +11,9 @@ import (
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("Enter the relative path to the folder: ")
+	fmt.Print("Enter the relative path to the file or folder: ")
 	scanner.Scan()
-	root := scanner.Text()
+	path := scanner.Text()
 
 	outputFile, err := os.Create("output.txt")
 	if err != nil {
@@ -24,40 +24,55 @@ func main() {
 
 	writer := bufio.NewWriter(outputFile)
 
-	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("Prevent panic by handling failure accessing a path %q: %v", path, err)
-		}
+	info, err := os.Stat(path)
+	if err != nil {
+		fmt.Fprintln(writer, err)
+		writer.Flush()
+		return
+	}
 
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				return fmt.Errorf("Failed to open the file %s: %v", path, err)
-			}
-			defer file.Close()
-
-			scanner = bufio.NewScanner(file)
-			lineNo := 1
-			for scanner.Scan() {
-				line := scanner.Text()
-				if containsJapanese(line) {
-					fmt.Fprintf(writer, "File: %s, Line %d: %s\n", path, lineNo, line)
-				}
-				lineNo++
-			}
-
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("Failed to scan the file %s: %v", path, err)
-			}
-		}
-		return nil
-	})
+	if info.IsDir() {
+		err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+			return checkFile(path, info, err, writer)
+		})
+	} else {
+		err = checkFile(path, info, err, writer)
+	}
 
 	if err != nil {
 		fmt.Fprintln(writer, err)
 	}
 
 	writer.Flush()
+}
+
+func checkFile(path string, info os.FileInfo, err error, writer *bufio.Writer) error {
+	if err != nil {
+		return fmt.Errorf("Prevent panic by handling failure accessing a path %q: %v", path, err)
+	}
+
+	if !info.IsDir() {
+		file, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("Failed to open the file %s: %v", path, err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNo := 1
+		for scanner.Scan() {
+			line := scanner.Text()
+			if containsJapanese(line) {
+				fmt.Fprintf(writer, "File: %s, Line %d: %s\n", filepath.Base(path), lineNo, line) // Use filepath.Base to get only filename from path
+			}
+			lineNo++
+		}
+
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("Failed to scan the file %s: %v", path, err)
+		}
+	}
+	return nil
 }
 
 func containsJapanese(s string) bool {
