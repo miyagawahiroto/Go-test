@@ -63,7 +63,8 @@ func checkFile(path string, info os.FileInfo, err error, writer *bufio.Writer) e
 		for scanner.Scan() {
 			line := scanner.Text()
 			if containsJapanese(line) {
-				fmt.Fprintf(writer, "File: %s, Line %d: %s\n", filepath.Base(path), lineNo, line) // Use filepath.Base to get only filename from path
+				// fmt.Fprintf(writer, "File: %s, Line %d: %s\n", filepath.Base(path), lineNo, line)
+				fmt.Fprintf(writer, "%s\n", line)
 			}
 			lineNo++
 		}
